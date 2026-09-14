@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import type { ProviderDefinition, QueryMode, SponsorshipPreview } from "@agenticgate/shared";
+import type { ProviderDefinition, QueryMode } from "@agenticgate/shared";
+import type { SponsorshipPreview } from "../lib/sponsorship.js";
 import {
   Activity,
+  AlertCircle,
   AlertTriangle,
   Check,
   CheckCircle2,
@@ -17,10 +19,11 @@ import {
   ShieldCheck,
   Sparkles,
   TerminalSquare,
+  TrendingUp,
   XCircle
 } from "lucide-react";
 import { Link } from "react-router-dom";
-import type { AnalyticsResponse, EvidenceCheckItem, PaidQueryResponse } from "../types.js";
+import type { AnalyticsResponse, EvidenceCheckItem, PaidQueryResponse, PrivacySafeAnalyticsResponse } from "../types.js";
 import { API_BASE_URL, fetchHealth, fetchJson, money } from "../lib/api.js";
 import {
   fetchSponsorshipEnabled,
@@ -139,6 +142,7 @@ export default function ControlDeckPage() {
   const [analytics, setAnalytics] = useState<AnalyticsResponse | null>(null);
   const [privacySafeAnalytics, setPrivacySafeAnalytics] = useState<PrivacySafeAnalyticsResponse | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isAnalyticsLoading, setIsAnalyticsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sponsorshipEnabled, setSponsorshipEnabled] = useState(false);
   const [healthDiagnostics, setHealthDiagnostics] = useState<{ network?: string; payToConfigured?: boolean; payToAddress?: string } | null>(null);
@@ -168,7 +172,7 @@ export default function ControlDeckPage() {
   const evidenceItems: EvidenceCheckItem[] = useMemo(() => {
     const resultOk = result !== null;
     const resultHasItems = (result?.result?.items?.length ?? 0) > 0;
-    const paymentCaptured = result?.payment?.paymentResponseHeader != null;
+    const paymentCaptured = result?.payment?.evidence != null;
     const hasUsage = (analytics?.totalQueries ?? 0) > 0;
     const hasSpend = (analytics?.totalSpendUsd ?? 0) > 0;
     const hasReceipts = (analytics?.recentTransactions?.length ?? 0) > 0;
@@ -201,7 +205,7 @@ export default function ControlDeckPage() {
         detail: paymentCaptured
           ? demoMode
             ? "demo tx (DEMO_MODE)"
-            : result!.payment.paymentResponseHeader!.slice(0, 16) + "..."
+            : result!.payment.evidence.transactionHash ?? result!.payment.evidence.kind!.slice(0, 16) + "..."
           : undefined
       },
       {
@@ -247,16 +251,21 @@ export default function ControlDeckPage() {
   }
 
   async function refreshMetrics() {
-    const data = await fetchJson<AnalyticsResponse>(`${API_BASE_URL}/api/analytics`);
-    setAnalytics(data);
-
-    // Fetch privacy-safe analytics
+    setIsAnalyticsLoading(true);
     try {
-      const privacySafeData = await fetchJson<PrivacySafeAnalyticsResponse>(`${API_BASE_URL}/api/v1/analytics?limit=5`);
-      setPrivacySafeAnalytics(privacySafeData);
-    } catch (analyticsError) {
-      // Silently fail to fetch privacy-safe analytics if endpoint not available
-      console.warn("Could not fetch privacy-safe analytics", analyticsError);
+      const data = await fetchJson<AnalyticsResponse>(`${API_BASE_URL}/api/analytics`);
+      setAnalytics(data);
+
+      // Fetch privacy-safe analytics
+      try {
+        const privacySafeData = await fetchJson<PrivacySafeAnalyticsResponse>(`${API_BASE_URL}/api/v1/analytics?limit=5`);
+        setPrivacySafeAnalytics(privacySafeData);
+      } catch (analyticsError) {
+        // Silently fail to fetch privacy-safe analytics if endpoint not available
+        console.warn("Could not fetch privacy-safe analytics", analyticsError);
+      }
+    } finally {
+      setIsAnalyticsLoading(false);
     }
   }
 
@@ -649,61 +658,61 @@ export default function ControlDeckPage() {
                   </div>
                   <div className="provider-sla-badges">
                     <span
-                      className={`sla-badge sla-latency sla-latency--${provider.slaBadge.latencyBand}`}
-                      title={provider.slaBadge.badgeCopy}
+                      className={`sla-badge sla-latency sla-latency--${provider.slaBadge?.latencyBand ?? "unknown"}`}
+                      title={provider.slaBadge?.badgeCopy ?? ""}
                     >
                       <Clock4 size={10} />{" "}
-                      {provider.slaBadge.latencyBand === "fast"
+                      {provider.slaBadge?.latencyBand === "fast"
                         ? "Fast"
-                        : provider.slaBadge.latencyBand === "standard"
+                        : provider.slaBadge?.latencyBand === "standard"
                           ? "Standard"
-                          : provider.slaBadge.latencyBand === "slow"
+                          : provider.slaBadge?.latencyBand === "slow"
                             ? "Slow"
                             : "Not verified"}
                     </span>
                     <span
-                      className={`sla-badge sla-reliability sla-reliability--${provider.slaBadge.reliabilityBand}`}
-                      title={provider.slaBadge.badgeCopy}
+                      className={`sla-badge sla-reliability sla-reliability--${provider.slaBadge?.reliabilityBand ?? "unknown"}`}
+                      title={provider.slaBadge?.badgeCopy ?? ""}
                     >
                       <ShieldCheck size={10} />{" "}
-                      {provider.slaBadge.reliabilityBand === "live"
+                      {provider.slaBadge?.reliabilityBand === "live"
                         ? "Live API"
-                        : provider.slaBadge.reliabilityBand === "demo"
+                        : provider.slaBadge?.reliabilityBand === "demo"
                           ? "Demo"
-                          : provider.slaBadge.reliabilityBand === "fallback"
+                          : provider.slaBadge?.reliabilityBand === "fallback"
                             ? "Fallback"
                             : "Not verified"}
                     </span>
                     <span
-                      className={`sla-badge sla-payment sla-payment--${provider.slaBadge.paymentMode}`}
-                      title={provider.slaBadge.badgeCopy}
+                      className={`sla-badge sla-payment sla-payment--${provider.slaBadge?.paymentMode ?? "unknown"}`}
+                      title={provider.slaBadge?.badgeCopy ?? ""}
                     >
                       <CircleDollarSign size={10} />{" "}
-                      {provider.slaBadge.paymentMode === "x402"
+                      {provider.slaBadge?.paymentMode === "x402"
                         ? "x402"
-                        : provider.slaBadge.paymentMode === "demo"
+                        : provider.slaBadge?.paymentMode === "demo"
                           ? "Demo"
-                          : provider.slaBadge.paymentMode === "sponsored"
+                          : provider.slaBadge?.paymentMode === "sponsored"
                             ? "Sponsored"
                             : "Not verified"}
                     </span>
                   </div>
-                  {provider.slaBadges ? (
+                  {provider.slaBadge ? (
                     <div className="provider-badges">
                       <span
-                        className={`badge badge-latency badge-latency-${provider.slaBadges.latencyBand}`}
+                        className={`badge badge-latency badge-latency-${provider.slaBadge?.latencyBand}`}
                       >
-                        {provider.slaBadges.latencyLabel}
+                        {provider.slaBadge?.latencyBand}
                       </span>
                       <span
-                        className={`badge badge-reliability badge-reliability-${provider.slaBadges.reliabilityBand}`}
+                        className={`badge badge-reliability badge-reliability-${provider.slaBadge?.reliabilityBand}`}
                       >
-                        {provider.slaBadges.reliabilityLabel}
+                        {provider.slaBadge?.reliabilityBand}
                       </span>
                       <span
-                        className={`badge badge-payment badge-payment-${provider.slaBadges.paymentMode}`}
+                        className={`badge badge-payment badge-payment-${provider.slaBadge?.paymentMode}`}
                       >
-                        {provider.slaBadges.paymentLabel}
+                        {provider.slaBadge?.paymentMode}
                       </span>
                     </div>
                   ) : (

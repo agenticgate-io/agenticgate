@@ -34,7 +34,7 @@ export function getPaymentEvidenceInfo(
     return {
       status: "demo",
       title: "Demo Mode Payment",
-      description: `Simulated transaction proof without live credentials (Payer: ${evidence.payer || "demo-agent"}).`,
+      description: `Simulated transaction proof without live credentials (demo-agent).`,
       className: "payment-banner--demo"
     };
   }
@@ -43,7 +43,7 @@ export function getPaymentEvidenceInfo(
     return {
       status: "failed",
       title: "Payment Verification Failed",
-      description: `The payment evidence is invalid: ${evidence.error || "unknown verification error"}.`,
+      description: `The payment evidence is invalid or could not be verified.`,
       className: "payment-banner--failed"
     };
   }
@@ -53,7 +53,6 @@ export function getPaymentEvidenceInfo(
       ? `${explorerBase}/tx/${evidence.transactionHash}`
       : undefined;
 
-    const sponsorText = evidence.payer ? ` (Payer: ${evidence.payer})` : "";
     const amountText =
       evidence.amount && evidence.asset ? ` of ${evidence.amount} ${evidence.asset}` : "";
 
@@ -62,8 +61,8 @@ export function getPaymentEvidenceInfo(
       title: evidence.kind === "settled" ? "Payment Settled" : "Payment Verified",
       description:
         evidence.kind === "settled"
-          ? `Successfully settled payment${amountText} on Stellar ${evidence.network}${sponsorText}.`
-          : `Authorized payment challenge${amountText} on Stellar ${evidence.network}${sponsorText} (settlement pending).`,
+          ? `Successfully settled payment${amountText} on Stellar ${evidence.network}.`
+          : `Authorized payment challenge${amountText} on Stellar ${evidence.network} (settlement pending).`,
       explorerUrl,
       className: "payment-banner--verified"
     };

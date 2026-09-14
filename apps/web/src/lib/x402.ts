@@ -27,15 +27,14 @@ function createMachineSigner(
 function enrichWithProofLinks(payload: PaidQueryResponse): PaidQueryResponse {
   if (payload?.payment?.evidence) {
     const ev = payload.payment.evidence;
-    if (!ev.proofLinks) {
-      ev.proofLinks = buildPaymentProofLinks({
-        transactionHash: ev.transactionHash,
-        payerPublicKey: ev.payer,
-        payToAddress: ev.payTo,
-        network: ev.network,
-        asset: ev.asset ?? undefined
-      });
-    }
+    if (!ev.transactionHash) return payload;
+    buildPaymentProofLinks({
+      transactionHash: ev.transactionHash,
+      payerPublicKey: undefined,
+      payToAddress: ev.payTo,
+      network: ev.network,
+      asset: ev.asset ?? undefined
+    });
   }
   return payload;
 }

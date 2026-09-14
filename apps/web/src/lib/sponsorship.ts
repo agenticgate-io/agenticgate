@@ -1,13 +1,21 @@
 import { signMessage } from "@stellar/freighter-api";
-import type {
-  QueryMode,
-  SignedGrant,
-  SponsorshipChallenge,
-  SponsorshipPreview
-} from "@agenticgate/shared";
+import type { QueryMode } from "@agenticgate/shared";
+import type { z } from "zod";
+import { signedGrantSchema, sponsorshipPreviewResponseSchema } from "@agenticgate/shared";
 import type { PaidQueryResponse } from "../types.js";
 import { fetchJson } from "./api.js";
 import { buildPaidClientRequestKey, getIdempotencyKey } from "./idempotency.js";
+
+type SignedGrant = z.infer<typeof signedGrantSchema>;
+export type SponsorshipPreview = z.infer<typeof sponsorshipPreviewResponseSchema>;
+
+// SponsorshipChallenge — defined locally as it's not exported from shared
+interface SponsorshipChallenge {
+  challengeId: string;
+  wallet: string;
+  message: string;
+  expiresAt: string;
+}
 
 function extractFreighterError(error: unknown) {
   if (!error) {

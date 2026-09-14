@@ -1,4 +1,4 @@
-import type { LatencyBucket, ProviderDefinition, QueryMode, QueryResult } from "@agenticgate/shared";
+import type { LatencyBucket, ProviderDefinition, QueryMode, QueryResult, PaymentEvidence, PrivacySafeAnalyticsAggregation } from "@agenticgate/shared";
 
 /**
  * Public-safe projection of `paymentEvidenceSummary` from the API.
@@ -107,5 +107,26 @@ export interface AnalyticsResponse {
 
 export type ProviderMap = Record<QueryMode, ProviderDefinition[]>;
 
-// Re-export privacy-safe analytics for web usage
-export type { PrivacySafeAnalyticsResponse };
+export interface EvidenceCheckItem {
+  id: string;
+  label: string;
+  status: "pass" | "warn" | "fail" | "pending";
+  detail?: string;
+}
+
+export interface PrivacySafeAnalyticsResponse {
+  aggregation: PrivacySafeAnalyticsAggregation;
+}
+
+export interface HealthResponse {
+  status: string;
+  network?: string;
+  payToConfigured?: boolean;
+  payToAddress?: string;
+  demoMode?: boolean;
+  diagnostics?: {
+    network?: string;
+    payToConfigured?: boolean;
+    payToAddress?: string;
+  };
+}

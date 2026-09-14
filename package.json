@@ -1,0 +1,45 @@
+{
+  "name": "agenticgate",
+  "version": "0.1.0",
+  "private": true,
+  "description": "AgenticGate monorepo: agentic pay-per-query hub with Stellar x402",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "engines": {
+    "node": ">=20.0.0 <25.0.0"
+  },
+  "scripts": {
+    "dev:api": "npm run dev --workspace @agenticgate/api",
+    "dev:web": "npm run dev --workspace @agenticgate/web",
+    "dev:agent": "npm run dev --workspace @agenticgate/agent-client",
+    "start:api": "npm run start --workspace @agenticgate/api",
+    "cli": "npm run cli --workspace @agenticgate/agent-client --",
+    "demo:agent": "npm run demo --workspace @agenticgate/agent-client",
+    "validate:real": "npm run validate:real --workspace @agenticgate/agent-client",
+    "preview:web": "npm run preview --workspace @agenticgate/web",
+    "build": "npm run build --workspaces",
+    "typecheck": "npm run typecheck --workspaces",
+    "test": "npm run test --workspace @agenticgate/shared && npm run test --workspace @agenticgate/api && npm run test --workspace @agenticgate/agent-client && npm run test --workspace @agenticgate/web",
+    "test:coverage": "npm run test:coverage --workspace @agenticgate/api",
+    "migrate:analytics": "npm run migrate:analytics --workspace @agenticgate/api",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "check:source-artifacts": "node scripts/check-source-artifacts.mjs",
+    "check:payment-leaks": "node scripts/check-payment-leaks.mjs",
+    "clean": "node scripts/clean.mjs"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.27.0",
+    "eslint": "^9.27.0",
+    "eslint-config-prettier": "^10.1.5",
+    "prettier": "^3.5.3",
+    "typescript": "^5.8.3",
+    "typescript-eslint": "^8.62.1"
+  },
+  "dependencies": {
+    "yallist": "3.1.1"
+  }
+}

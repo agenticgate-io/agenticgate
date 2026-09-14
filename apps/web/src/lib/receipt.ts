@@ -1,0 +1,165 @@
+import type { AgenticGateReceipt, QueryMode } from "@agenticgate/shared";
+import type { PaidQueryResponse, PublicPaymentEvidence } from "../types.js";
+
+/**
+ * User-selected payment mode. `"demo"` is inferred from the receipt itself
+ * (the API stamped the response with `evidence.kind === "demo"`).
+ */
+export type ReceiptPaymentMode = "wallet" | "sponsored" | "demo";
+
+const RECEIPT_SCHEMA = "agenticgate.receipt.v1" as const;
+
+export interface BuildReceiptInput {
+  /** Successful API response from one paid demo/query run. */
+  response: PaidQueryResponse;
+  /** User-selected payment mode at the moment the query ran. */
+  userPaymentMode: "wallet" | "sponsored";
+  /** Optional override for the generation timestamp (used by tests). */
+  generatedAt?: Date;
+}
+
+function normalizeStatus(
+  status: string | undefined
+): "verified" | "settled" | "failed" | "demo-paid" | null {
+  switch (status) {
+    case "verified":
+    case "settled":
+    case "failed":
+    case "demo-paid":
+      return status;
+    default:
+      // Includes the `"settlement-pending"` interim status the API can produce
+      // before any settlement confirmation; we surface it as `null` rather than
+      // expose an internal-only state.
+      return null;
+  }
+}
+
+function normalizeKind(
+  kind: PaymentEvidenceKind | undefined
+): "demo" | "verified" | "settled" | "failed" | null {
+  switch (kind) {
+    case "demo":
+    case "verified":
+    case "settled":
+    case "failed":
+      return kind;
+    default:
+      return null;
+  }
+}
+
+type PaymentEvidenceKind = PublicPaymentEvidence["kind"];
+
+/**
+ * Build a public, paste-into-a-public-SCF-issue JSON receipt from the latest
+ * paid query response. NEVER include:
+ *  - full base64 payment headers (would leak the signed payment payload),
+ *  - facilitator responses (could leak signed auth entries),
+ *  - facilitator API keys, raw wallet secrets, or grant signatures,
+ *  - sponsorship grant or challenge responses,
+ *  - the payer wallet address (public on-chain, but never paste-able by design).
+ *
+ * Missing payment fields render as `null` here so the JSON stays diff-friendly
+ * in code review and SCF issue threads.
+ */
+export function buildReceipt(input: BuildReceiptInput): AgenticGateReceipt {
+  const { response, userPaymentMode } = input;
+  const generatedAt = (input.generatedAt ?? new Date()).toISOString();
+  const evidence: PublicPaymentEvidence | undefined = response.payment?.evidence;
+  const kind = normalizeKind(evidence?.kind);
+  const status = normalizeStatus(evidence?.status);
+  const transactionHash = evidence?.transactionHash ?? null;
+  const network = evidence?.network ?? response.payment?.network ?? null;
+  const paymentMode: ReceiptPaymentMode = kind === "demo" ? "demo" : userPaymentMode;
+
+  return {
+    schema: RECEIPT_SCHEMA,
+    generatedAt,
+    mode: response.result.mode satisfies QueryMode,
+    providerId: response.result.providerId,
+    providerName: response.result.providerName,
+    quotedPriceUsd: response.result.priceUsd,
+    traceId: response.result.traceId,
+    resultTimestamp: response.result.timestamp,
+    payment: {
+      mode: paymentMode,
+      status,
+      evidenceKind: kind,
+      transactionHash,
+      network
+    }
+  };
+}
+
+/**
+ * Serialize a receipt to a stable, human-readable JSON string. Stable key
+ * ordering means repeated exports diff cleanly in code review.
+ */
+export function serializeReceipt(receipt: AgenticGateReceipt): string {
+  return `${JSON.stringify(receipt, null, 2)}\n`;
+}
+
+/**
+ * Build a safe filename for the downloaded JSON receipt. Avoids leaking
+ * provider ids into the path beyond a short slug.
+ */
+export function receiptFilename(receipt: AgenticGateReceipt, generatedAt?: Date): string {
+  const stamp = (generatedAt ?? new Date(receipt.generatedAt))
+    .toISOString()
+    .replace(/[:.]/g, "-");
+  const providerSlug = receipt.providerId.replace(/[^a-z0-9_.-]/gi, "_");
+  return `agenticgate-receipt-${receipt.mode}-${providerSlug}-${stamp}.json`;
+}
+
+export interface CopyReceiptResult {
+  ok: boolean;
+  method: "clipboard" | "fallback";
+  bytes: number;
+}
+
+/**
+ * Copy the receipt to the clipboard with a download fallback. The fallback
+ * triggers automatically when the Clipboard API is unavailable (older
+ * browsers, restrictive iframes, missing permissions).
+ */
+export async function copyReceiptToClipboard(
+  receipt: AgenticGateReceipt
+): Promise<CopyReceiptResult> {
+  const json = serializeReceipt(receipt);
+  if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
+    try {
+      await navigator.clipboard.writeText(json);
+      return { ok: true, method: "clipboard", bytes: json.length };
+    } catch {
+      // fall through to download fallback
+    }
+  }
+  downloadReceipt(receipt, json);
+  return { ok: true, method: "fallback", bytes: json.length };
+}
+
+/**
+ * Trigger a JSON file download for the receipt. SSR/no-DOM callers can no-op
+ * via `typeof document === "undefined"`.
+ */
+export function downloadReceipt(
+  receipt: AgenticGateReceipt,
+  payload?: string,
+  generatedAt?: Date
+): void {
+  if (typeof document === "undefined" || typeof URL === "undefined" || typeof Blob === "undefined") {
+    return;
+  }
+  const json = payload ?? serializeReceipt(receipt);
+  const blob = new Blob([json], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = receiptFilename(receipt, generatedAt);
+  anchor.rel = "noopener";
+  document.body.appendChild(anchor);
+  anchor.click();
+  document.body.removeChild(anchor);
+  URL.revokeObjectURL(url);
+}
